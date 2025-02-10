@@ -61,14 +61,19 @@ def sqmmd_est2(dat1, dat2, kernel) :
     if kernel == "square" :
         kXX, kYY, kXY = (XX + np.ones( (m, m) ))**2, (YY + np.ones( (n, n) ))**2, (XY + np.ones( (m, n) ))**2
     if kernel == "exponential" :
-        dXX_mm = np.vstack((np.diag(XX), )*m)
-        dYY_nn = np.vstack((np.diag(YY), )*n)
-        dXX_mn = np.hstack((np.diag(XX), )*n)
-        dYY_mn = np.vstack((np.diag(YY), )*m)
+        # dXX_mm = np.vstack((np.diag(XX), )*m) # m*m matrix : each row is the diagonal x_i^Tx_i
+        # dYY_nn = np.vstack((np.diag(YY), )*n) # n*n matrix : each row is the diagonal y_i^Ty_i
+        # dXX_mn = np.hstack((np.diag(XX), )*n) # m*n matrix : each row is the diagonal x_i^Tx_i
+        # dYY_mn = np.vstack((np.diag(YY), )*m) # n*m matrix : each row is the diagonal y_i^Ty_i
 
-        kXX = math.exp( -0.5*( dXX_mm + np.transpose(dXX_mm) - 2*XX ) ) 
-        kYY = math.exp( -0.5*( dYY_nn + np.transpose(dYY_nn) - 2*YY ) )
-        kXY = math.exp( -0.5*( dXX_mn + dYY_mn - 2*XY ) )
+        dXX_mm = np.vstack((np.diag(XX), )*m) # m*m matrix : each row is the diagonal x_i^Tx_i
+        dYY_nn = np.vstack((np.diag(YY), )*n) # n*n matrix : each row is the diagonal y_i^Ty_i
+        dXX_mn = np.vstack((np.diag(XX), )*n).transpose() # m*n matrix : each row is the diagonal x_i^Tx_i
+        dYY_mn = np.vstack((np.diag(YY), )*m) # m*n matrix : each row is the diagonal y_i^Ty_i
+
+        kXX = np.exp( -0.5*( dXX_mm + dXX_mm.transpose() - 2*XX ) ) 
+        kYY = np.exp( -0.5*( dYY_nn + dYY_nn.transpose() - 2*YY ) )
+        kXY = np.exp( -0.5*( dXX_mn + dYY_mn - 2*XY ) )
         
     val = (kXX.sum() - np.diag(kXX).sum())/(m*(m - 1)) + (kYY.sum() - np.diag(kYY).sum())/(n*(n - 1)) - 2*kXY.sum()/(n*m)
     if val < 0 : 
@@ -118,13 +123,14 @@ def row_Metric(i, j, t, Data, Masking, kernel, exc_opt) :
 def row_mmDNN(i, t, Data, row_Dissim_vec, Masking, eta) : 
     """
     Implements DNN with MMD_k^2 to impute (i, t) entry using eta radius
+    Note that kernel information is already encoded in row_Dissim_vec
+    This ftn regards the (i) identification of neighbor and (ii) averaging
 
     t th column of Data is used for averaging
     t th column of Masking is used to pick the ones observed ... (1)
     row_Dissim_vec, eta are used to pick the ones within neighborhood ... (2)
     when intersecting (1) and (2), make sure to exclude i th row and then take the barycenter
-    
-    note kernel information is already used when constructing row_Dissim_vec from another function 
+
 
     Input
         i, t : index of target distribution - mu_{i, t}
@@ -163,7 +169,7 @@ def row_mmDNN(i, t, Data, row_Dissim_vec, Masking, eta) :
 
 def mmDNN_cv(Data, Masking, kernel, eta_cand) : 
     """
-    Among eta_cand, chooses the optimal radius eta that minimizes 2-fold CV error
+    2-fold CV error
 
     Input 
         Data : Full data that is split into two - train & test
@@ -219,12 +225,19 @@ def mmDNN_cv(Data, Masking, kernel, eta_cand) :
 def mmDNN_direct(i, t, Data, row_Dissim_vec, Masking, eta_cand, delta, kernel):
     """
     A direct optimization over hyper-parameter eta, without using CV/Data-splitting
+    
+    Input 
+        Data : Full data that is split into two - train & test
+        Masking : Full Masking matrix that is split into two - train & test
+        eta_cand : Candidate of radius that is explored
 
+    Output
+        Optimal radius eta^star
     """
     if kernel == "exponential":
         sup_kern = 1 
     if kernel == "square":
-        sup_kern = 1 # Should change
+        sup_kern = 10 # Should change
 
     N, T, n, d = Data.shape[0], Data.shape[1], Data.shape[2], Data.shape[3]
     c_0 = 8*np.exp(1/(np.exp(1)))/np.sqrt(2*np.exp(1)*np.log(2))
