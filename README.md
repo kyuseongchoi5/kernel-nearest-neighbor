@@ -2,6 +2,8 @@
 
 ## Problem 
 
+Here we consider a distributional matrix completion problem: Entries of an $N \times T$ sized matrix contains $n$ measurements $X_1(i, t), ..., X_n(i, t) \in \mathbb R^d$.
+
 Consider a matrix where multiple measurements are contained per matrix entry. Some matrix entries are missing, meaning multiple measurements are not available for such entry. Our aim is to use neighboring observed multiple measurements to learn the empirical distribution of the missing multiple measurements that would have been otherwise observed.
 
 ## Algorithm 
